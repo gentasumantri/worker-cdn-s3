@@ -1,0 +1,21 @@
+{
+  "name": "worker-cdn-s3",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail",
+    "secret:set": "wrangler secret put STORAGE_SECRET_ACCESS_KEY",
+    "format": "prettier --write .",
+    "check": "prettier --check ."
+  },
+  "dependencies": {
+    "aws4fetch": "^1.0.20"
+  },
+  "devDependencies": {
+    "prettier": "^3.8.3",
+    "wrangler": "^4.93.1"
+  }
+}

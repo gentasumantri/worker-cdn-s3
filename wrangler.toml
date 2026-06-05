@@ -1,0 +1,36 @@
+name = "worker-cdn-s3"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+# Auto-re-enabled on every deploy unless held off here.
+send_metrics = false
+workers_dev = false
+preview_urls = false
+
+# Logs + traces for `wrangler tail` and the dashboard logs panel.
+# Note: `invocation_logs = true` captures full request URLs, including SigV4
+# query params on the passthrough route. Flip to false if log access is
+# broader than the signature-replay window you accept.
+[observability]
+enabled = false
+head_sampling_rate = 1
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = true
+persist = true
+head_sampling_rate = 1
+
+# Uncomment to deploy vars from this file instead of the CF dashboard.
+# `STORAGE_SECRET_ACCESS_KEY` is always a secret. Set via dashboard or `wrangler secret put`.
+# [vars]
+# STORAGE_ACCESS_KEY_ID = ""
+# STORAGE_REGION = ""
+# STORAGE_HOSTNAME = ""
+# PUBLIC_PATH_PREFIX = "public"   # custom prefix, or "*" for full public, or leave unset for all-private
+# PUBLIC_CACHE_TTL = "86400"

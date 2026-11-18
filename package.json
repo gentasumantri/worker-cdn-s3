@@ -9,7 +9,8 @@
     "tail": "wrangler tail",
     "secret:set": "wrangler secret put STORAGE_SECRET_ACCESS_KEY",
     "format": "prettier --write .",
-    "check": "prettier --check ."
+    "check": "prettier --check .",
+    "test": "node --test"
   },
   "dependencies": {
     "aws4fetch": "^1.0.20"

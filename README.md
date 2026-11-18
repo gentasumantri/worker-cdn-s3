@@ -53,6 +53,9 @@ npm install
 npm run deploy
 ```
 
+Dashboard vars survive deploys because `wrangler.toml` sets `keep_vars = true`. Vars passed with `--var` or a `[vars]`
+block still override them for that deploy.
+
 ### Auto via Workers Builds
 
 Connect the GitHub repo in **Worker > Settings > Build > Git integration**. To deploy under a custom name (e.g.

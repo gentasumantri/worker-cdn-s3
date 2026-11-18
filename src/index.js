@@ -1,4 +1,5 @@
 import { AwsClient } from "aws4fetch"
+import { signedTtl } from "./signed-ttl.js"
 
 const ALLOWED_METHODS = new Set(["GET", "HEAD"])
 
@@ -32,18 +33,29 @@ export default {
       return servePublic(upstreamUrl, env)
     }
 
+    // A cached copy must never outlive its signature, otherwise expired links keep working at the edge
+    // whatever Cache-Control the bucket sends. Unsigned, expired, and error responses are never cached.
+    const ttl = signedTtl(url.searchParams, Date.now())
+
     // fetch() auto-rewrites Host to env.STORAGE_HOSTNAME so SigV4 signatures verify.
     const passthrough = await fetch(upstreamUrl, {
       method: request.method,
       headers: request.headers,
       body: request.body,
+      cf: {
+        cacheEverything: ttl > 0,
+        cacheTtlByStatus: ttl > 0 ? { "200-299": ttl, "300-599": -1 } : { "100-599": -1 },
+      },
     })
-    return withSecurityHeaders(passthrough)
+    const cacheControl = ttl > 0 && passthrough.ok ? `private, max-age=${ttl}` : "no-store"
+    return withSecurityHeaders(passthrough, cacheControl)
   },
 }
 
-function withSecurityHeaders(response) {
+function withSecurityHeaders(response, cacheControl) {
   const headers = new Headers(response.headers)
+  headers.set("Cache-Control", cacheControl)
+  headers.delete("Expires")
   headers.set("X-Content-Type-Options", "nosniff")
   return new Response(response.body, {
     status: response.status,

@@ -8,7 +8,12 @@ transparent passthrough for app-issued presigned URLs. Works with any SigV4-comp
 - **Public prefix** (set via `PUBLIC_PATH_PREFIX`): Worker holds a read-only key, signs `GET` at the edge, response
   cached at Cloudflare.
 - **Everything else**: passthrough. App server authorizes per-user, presigns against the upstream bucket, Worker
-  forwards as-is. The bucket validates the signature.
+  forwards as-is. The bucket validates the signature. Successful responses are cached at the edge (and in the browser)
+  only until the signature expires, computed from `X-Amz-Date` + `X-Amz-Expires`, so an expired link never keeps
+  working from cache. Revoking access early (deleting the file or the key) does not evict copies already cached; they
+  stay reachable until the link expires, so keep presign lifetimes short. Unsigned, expired, and error responses are
+  never cached. Apps that reuse the same presigned
+  URL for a while (e.g. signing time rounded to the hour) get shared edge hits for free.
 
 `PUBLIC_PATH_PREFIX` modes:
 
@@ -67,7 +72,8 @@ Create a read-only application/access key scoped to your bucket. Scope it to the
 (e.g. `public/`). For `PUBLIC_PATH_PREFIX=*` scope to the whole bucket. If `PUBLIC_PATH_PREFIX` is unset (all-private
 mode), the Worker does not call the bucket directly, so this key can be omitted.
 
-Set the bucket's default `Cache-Control` header so Cloudflare caches consistently:
+Set the bucket's default `Cache-Control` header so Cloudflare caches the public prefix (without it the edge returns
+`BYPASS`). Passthrough responses ignore it and stay capped at the signature expiry:
 
 ```
 Cache-Control: public, max-age=86400
@@ -113,7 +119,8 @@ curl -I https://<STORAGE_HOSTNAME>/public/avatars/<id>          # 403
 curl -I https://cdn.example.com/public/avatars/<id>             # 200
 
 # CDN private path (presigned by app):
-curl -I "https://cdn.example.com/<key>?X-Amz-Signature=..."     # 200; 403 if tampered
+curl -I "https://cdn.example.com/<key>?X-Amz-Signature=..."     # 200, cached until the signature expires
+                                                                 # 403 if tampered, 401 if unsigned or expired
 ```
 
 ## Operations
@@ -129,4 +136,5 @@ npm run tail   # tail production logs
 npm install
 npm run format    # prettier: auto-format
 npm run check     # prettier: check formatting (CI)
+npm test          # node:test unit tests
 ```

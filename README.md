@@ -9,11 +9,11 @@ transparent passthrough for app-issued presigned URLs. Works with any SigV4-comp
   cached at Cloudflare.
 - **Everything else**: passthrough. App server authorizes per-user, presigns against the upstream bucket, Worker
   forwards as-is. The bucket validates the signature. Successful responses are cached at the edge (and in the browser)
-  only until the signature expires, computed from `X-Amz-Date` + `X-Amz-Expires`, so an expired link never keeps
-  working from cache. Revoking access early (deleting the file or the key) does not evict copies already cached; they
-  stay reachable until the link expires, so keep presign lifetimes short. Unsigned, expired, and error responses are
-  never cached. Apps that reuse the same presigned
-  URL for a while (e.g. signing time rounded to the hour) get shared edge hits for free.
+  only until the signature expires, computed from `X-Amz-Date` + `X-Amz-Expires`, so an expired link never keeps working
+  from cache. Revoking access early (deleting the file or the key) does not evict copies already cached; they stay
+  reachable until the link expires, so keep presign lifetimes short. Unsigned, expired, and error responses are never
+  cached. Apps that reuse the same presigned URL for a while (e.g. signing time rounded to the hour) get shared edge
+  hits for free.
 
 `PUBLIC_PATH_PREFIX` modes:
 
@@ -110,7 +110,27 @@ through `wrangler secret put` or the dashboard. Never in the toml.
 ### 3. Custom domain
 
 Add via **Worker > Settings > Domains & Routes > Add Custom Domain**. Routes set in the dashboard persist across deploys
-because the toml declares none.
+because the toml declares none, so do not pass `--domain` on deploy.
+
+### 4. Zone cache settings (required)
+
+In the CDN domain's zone, set **Caching > Configuration > Browser Cache TTL** to **Respect Existing Headers**. Any other
+value raises a shorter browser `max-age` up to that TTL, so browsers keep private files after their link expires. The
+Worker cannot prevent this; it is applied after the Worker responds. Check it on every zone that serves this Worker.
+
+## App integration
+
+- **Private files**: presign `GET` against the bucket host, then swap the host for the CDN domain (path and query
+  unchanged). Keep lifetimes short; a cached copy stays reachable until its link expires, even if the file is deleted.
+- **Shared edge cache**: presigned URLs are deterministic. Round the signing time (e.g. to the hour) and make the
+  lifetime longer than the rounding window (e.g. 2 hours), so everyone gets the same URL within that window and hits the
+  edge cache. Without rounding every URL is unique: still safe, just no shared hits.
+- **Public files**: store under `PUBLIC_PATH_PREFIX` and link `https://<cdn>/<prefix>/<key>` directly, no signing. Use
+  unique keys (e.g. random names) so replaced files never collide with the one-day edge copy.
+- **Uploads** never go through the Worker (`PUT` returns 405). Presign `PUT` against the bucket host and add a bucket
+  CORS rule for the app origin.
+- **Logs**: with `invocation_logs = true` the Worker logs full request URLs, including signatures. Anyone who can read
+  the logs can reuse a link until it expires.
 
 ## Verification
 
